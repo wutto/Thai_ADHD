@@ -1,0 +1,258 @@
+#####################################################################################
+##Step3 ==> Taxonomic classification
+##Source: https://otagoedna.github.io/getting_started_with_qiime2/first_workflow.html
+##Source: https://docs.qiime2.org/2021.11/tutorials/importing/
+##Source: http://compbio.ucsd.edu/wp-content/uploads/2018/07/20180621_oslo_university_microbiome_analysis_with_qiime2_tutorial.pdf
+
+##Silva database: https://www.arb-silva.de/
+#####################################################################################
+##Create directory for this step
+mkdir 3_taxonomicClassification
+#####################################################################################
+#[1] Taxonomic classification by consensus BLAST+ against Silva database
+##Assign taxonon using BLAST+ against silva database
+qiime feature-classifier classify-consensus-blast \
+  --i-query 2_asvConstruction/repSeqFilt.qza \
+  --i-reference-reads ./QIIME2_database/version_2022_2/silva/silva_full.qza \
+  --i-reference-taxonomy ./QIIME2_database/version_2022_2/silva/taxonomy_silva.qza \
+  --p-perc-identity 0.9 \
+  --o-classification ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qza \
+  --verbose
+
+##Create visualization file
+qiime metadata tabulate \
+--m-input-file ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qza \
+--o-visualization ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qzv
+
+qiime tools export \
+--input-path ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qzv \
+--output-path ./3_taxonomicClassification/1_summary_taxonomy_assignment
+#####################################################################################
+##[2]Filtered unwanted taxon
+##In this case, we would like to remove all features that contain either mitochondria or chloroplast in their taxonomic annotation.
+
+Ref: https://forum.qiime2.org/t/mitochondrial-16s-handling/1384
+Ref: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4133986/
+REf: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7529756/
+
+##Filter from feature table
+##Remove features that contain mitochondria or chloroplast
+qiime taxa filter-table \
+--i-table 2_asvConstruction/featureTableFilt.qza \
+--i-taxonomy ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qza \
+--p-include p__ \
+--p-exclude mitochondria,chloroplast \
+--o-filtered-table 2_asvConstruction/featureTableFiltNoMitochondriaChloroplast.qza
+
+##Filter Eukaryota
+qiime taxa filter-table \
+--i-table 2_asvConstruction/featureTableFiltNoMitochondriaChloroplast.qza \
+--i-taxonomy ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qza \
+--p-exclude "k__Eukaryota" \
+--o-filtered-table 2_asvConstruction/featureTableFiltNoMitochondriaChloroplastEukaryota.qza
+
+##Change feature table name
+rm 2_asvConstruction/featureTableFiltNoMitochondriaChloroplast.qza
+mv 2_asvConstruction/featureTableFiltNoMitochondriaChloroplastEukaryota.qza 2_asvConstruction/featureTableFiltClean.qza
+
+##Visualize filtered and cleaned data
+qiime feature-table summarize \
+--i-table 2_asvConstruction/featureTableFiltClean.qza \
+--o-visualization 2_asvConstruction/featureTableFiltClean.qzv
+
+qiime tools export \
+--input-path ./2_asvConstruction/featureTableFiltClean.qzv \
+--output-path ./2_asvConstruction/3_summary_featureTable_filter_clean
+
+##Filter from sequences
+##Remove sequences that contain mitochondria or chloroplast
+qiime taxa filter-seqs \
+--i-sequences 2_asvConstruction/repSeqFilt.qza \
+--i-taxonomy ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qza \
+--p-include p__ \
+--p-exclude mitochondria,chloroplast \
+--o-filtered-sequences 2_asvConstruction/repSeqFiltNoMitochondriaChloroplast.qza
+
+##Remove Eukaryota
+qiime taxa filter-seqs \
+--i-sequences 2_asvConstruction/repSeqFiltNoMitochondriaChloroplast.qza \
+--i-taxonomy ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qza \
+--p-exclude "k__Eukaryota" \
+--o-filtered-sequences 2_asvConstruction/repSeqFiltNoMitochondriaChloroplastEukaryota.qza
+
+##Change representative sequence name
+rm 2_asvConstruction/repSeqFiltNoMitochondriaChloroplast.qza
+mv 2_asvConstruction/repSeqFiltNoMitochondriaChloroplastEukaryota.qza 2_asvConstruction/repSeqFiltClean.qza
+
+##Visualize filtered and cleaned data
+qiime feature-table tabulate-seqs \
+--i-data 2_asvConstruction/repSeqFiltClean.qza \
+--o-visualization 2_asvConstruction/repSeqFiltClean.qzv
+
+qiime tools export \
+--input-path ./2_asvConstruction/repSeqFiltClean.qzv \
+--output-path ./2_asvConstruction/3_summary_representative_sequence_filter_clean
+#####################################################################################
+##[3] Visualization
+##[3.1] Create the visualization in Bar Plot
+qiime taxa barplot \
+--i-table 2_asvConstruction/featureTableFiltClean.qza \
+--i-taxonomy ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qza \
+--m-metadata-file sample-metadata.tsv \
+--o-visualization ./3_taxonomicClassification/taxonomy_blastConsensus_silva_barPlots.qzv
+
+qiime tools export \
+--input-path ./3_taxonomicClassification/taxonomy_blastConsensus_silva_barPlots.qzv \
+--output-path ./3_taxonomicClassification/2_taxonomy_barChart 
+
+##[3.2] Krona chart
+##source: https://github.com/kaanb93/q2-krona
+##source: https://library.qiime2.org/plugins/q2-krona/39/
+
+##Visualize with Silva database
+qiime krona collapse-and-plot \
+--i-table 2_asvConstruction/featureTableFiltClean.qza \
+--i-taxonomy ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qza \
+--o-krona-plot ./3_taxonomicClassification/taxonomy_blastConsensus_silva_krona.qzv
+
+qiime tools export \
+--input-path ./3_taxonomicClassification/taxonomy_blastConsensus_silva_krona.qzv \
+--output-path ./3_taxonomicClassification/2_taxonomy_krona 
+#####################################################################################
+##[4] Differential Abundance Analysis 
+##[4.1] Differential Abundance Analysis using ANCOM
+##Source: https://forum.qiime2.org/t/ancom-tutorial-moving-pictures-of-the-human-microbiome-dataset/921
+
+##[step1] Collape taxonomy ==> level 6
+##[step1] Collapse features to a chosen taxonomic level before ANCOM
+qiime taxa collapse \
+--i-table 2_asvConstruction/featureTableFiltClean.qza \
+--i-taxonomy ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qza \
+--p-level 6 \
+--o-collapsed-table ./3_taxonomicClassification/ancom_input_silva_level6.qza
+
+qiime composition add-pseudocount \
+--i-table ./3_taxonomicClassification/ancom_input_silva_level6.qza \
+--o-composition-table ./3_taxonomicClassification/ancom_input_silva_level6_comp.qza
+
+##please check this in metadata file
+qiime composition ancom \
+--i-table ./3_taxonomicClassification/ancom_input_silva_level6_comp.qza \
+--m-metadata-file sample-metadata.tsv \
+--m-metadata-column group \
+--o-visualization ./3_taxonomicClassification/ancom_output_silva_level6_group.qzv
+
+qiime composition ancom \
+--i-table ./3_taxonomicClassification/ancom_input_silva_level6_comp.qza \
+--m-metadata-file sample-metadata.tsv \
+--m-metadata-column B2 \
+--o-visualization ./3_taxonomicClassification/ancom_output_silva_level6_B2.qzv
+
+qiime composition ancom \
+--i-table ./3_taxonomicClassification/ancom_input_silva_level6_comp.qza \
+--m-metadata-file sample-metadata.tsv \
+--m-metadata-column group_B2 \
+--o-visualization ./3_taxonomicClassification/ancom_output_silva_level6_group_B2.qzv
+
+##Export result
+qiime tools export \
+--input-path ./3_taxonomicClassification/ancom_output_silva_level6_group.qzv \
+--output-path ./3_taxonomicClassification/3_abundance_test_ancom_group
+
+qiime tools export \
+--input-path ./3_taxonomicClassification/ancom_output_silva_level6_B2.qzv \
+--output-path ./3_taxonomicClassification/3_abundance_test_ancom_B2
+
+qiime tools export \
+--input-path ./3_taxonomicClassification/ancom_output_silva_level6_group_B2.qzv \
+--output-path ./3_taxonomicClassification/3_abundance_test_ancom_group_B2
+#####################################################################################
+##[4.2] Differential Abundance Analysis using LEfSe
+##LEfSe (Linear discriminant analysis Effect Size)
+Reference: https://huttenhower.sph.harvard.edu/lefse/
+Tutorial source: https://github.com/statonlab/BiGG2020_CrackNAg/wiki/qiime2-to-lefse
+
+##After install LEFSE via conda
+##There are 5 command in bin folder
+##lefse_format_input.py
+##lefse_run.py
+##lefse_plot_cladogram.py
+##lefse_plot_features.py
+##lefse_plot_res.py
+
+##[step1] prepare qiime2 files for lefse
+#Collapse taxonomy to any level you want, in this case is  level 6
+qiime taxa collapse \
+--i-table 2_asvConstruction/featureTableFiltClean.qza \
+--i-taxonomy ./3_taxonomicClassification/taxonomy_blastConsensus_silva.qza \
+--p-level 6 \
+--o-collapsed-table ./3_taxonomicClassification/lefseCollapseTableLevel6.qza
+
+#Calculate the relative abundance of taxa
+qiime feature-table relative-frequency \
+--i-table ./3_taxonomicClassification/lefseCollapseTableLevel6.qza \
+--o-relative-frequency-table ./3_taxonomicClassification/lefseCollapseTableLevel6Frequency.qza 
+
+#Export the collapseFrequencyLevel6.qza into biom and biom convert to tsv format
+#Export to biom
+qiime tools export \
+--input-path ./3_taxonomicClassification/lefseCollapseTableLevel6Frequency.qza \
+--output-path ./3_taxonomicClassification/4_lefse_collapse_frequency/
+
+# convert biom to tsv
+biom convert --to-tsv \
+-i ./3_taxonomicClassification/4_lefse_collapse_frequency/feature-table.biom \
+-o ./3_taxonomicClassification/4_lefse_collapse_frequency/collapseFrequencyLevel6.txt
+
+## Modify the collapseFrequencyLevel6.txt by:
+## 1. Delete the # Constructed from biom file in the table.txt.
+## 2. Delete the # before OTUID
+## 3. The first two tows are the metadata of the samples, the third row is the sample ID.
+##I would use the transpose function in MS excel to convert the metadata,and edit the sampleID into the correct order to fit my sample ID order.
+##Then copy the two metadata rows into a meta.txt and merge the meta file with the sample frequency file.
+## Save input lefse file as collapseFrequencyLevel6MetaData.txt
+
+##Use python script to generate LEfSe input based on metadata file
+##generateLefseInput.ipynb
+
+##Run LEFSE
+conda deactivate
+conda activate LEFSE
+
+##format input data
+lefse_format_input.py ./3_taxonomicClassification/4_lefse_collapse_frequency/inputLefse_group.txt \
+./3_taxonomicClassification/4_lefse_collapse_frequency/inputLefseformat_group.txt \
+-c 1 -u 1 -o 1000000
+
+##Run LEfSe
+lefse_run.py \
+./3_taxonomicClassification/4_lefse_collapse_frequency/inputLefseformat_group.txt \
+./3_taxonomicClassification/4_lefse_collapse_frequency/outputLefseformat_group.txt -b 200 -l 4
+
+##Visualize lefse result
+##Bar plot with PDF
+lefse_plot_res.py \
+--format pdf \
+--dpi 300 \
+./3_taxonomicClassification/4_lefse_collapse_frequency/outputLefseformat_group.txt \
+./3_taxonomicClassification/4_lefse_collapse_frequency/barChart_group.pdf
+
+##Cladogram plot with PDF
+lefse_plot_cladogram.py \
+--format pdf \
+--dpi 300 \
+./3_taxonomicClassification/4_lefse_collapse_frequency/outputLefseformat_group.txt \
+./3_taxonomicClassification/4_lefse_collapse_frequency/cladogram_group.pdf
+
+##Feature plot with PDF
+
+lefse_plot_features.py \
+--format pdf \
+--dpi 300 \
+./3_taxonomicClassification/4_lefse_collapse_frequency/inputLefseformat_group.txt \
+./3_taxonomicClassification/4_lefse_collapse_frequency/outputLefseformat_group.txt \
+./3_taxonomicClassification/4_lefse_collapse_frequency/featurePlot_group.pdf
+
+##DONE !!!
+##############################################################################################################
+##############################################################################################################

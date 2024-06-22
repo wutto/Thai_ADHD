@@ -1,0 +1,103 @@
+#####################################################################################
+##Step4 ==> Diversity analysis
+##Source: https://otagoedna.github.io/getting_started_with_qiime2/first_workflow.html
+##Source: https://docs.qiime2.org/2021.11/tutorials/importing/
+##Source: http://compbio.ucsd.edu/wp-content/uploads/2018/07/20180621_oslo_university_microbiome_analysis_with_qiime2_tutorial.pdf
+##Source: https://rachaellappan.github.io/VL-QIIME2-analysis/index.html
+
+##After we created ASV table and removed un wanted taxon,
+#two input files have been generated including;
+#1) 2_asvConstruction/featureTableFiltClean.qza
+#2) 2_asvConstruction/repSeqFiltClean.qza 
+
+##[1] Phylogenetic tree construction
+##Before running QIIME2 core diversity analysis using core-metrics-phylogenetic
+##Firstly, we need to create phylogenetic tree
+
+##Create folder for this step
+mkdir 4_diversityAnalysis
+
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences 2_asvConstruction/repSeqFiltClean.qza \
+  --output-dir 4_diversityAnalysis/phylogeny-align-to-tree-mafft-fasttree
+
+##!!! Before running this step, we need to observe the number of mininmum sequence in sample
+##Please use command "qiime tools export" to extract and observe the data
+##Please see the summary in folder "3_summary_featureTable_filter_clean"
+##Then change the parameter for p-sampling-depth
+
+qiime diversity core-metrics-phylogenetic \
+--i-phylogeny 4_diversityAnalysis/phylogeny-align-to-tree-mafft-fasttree/rooted_tree.qza \
+--i-table 2_asvConstruction/featureTableFiltClean.qza \
+--p-sampling-depth 43798 \
+--m-metadata-file sample-metadata.tsv \
+--output-dir ./4_diversityAnalysis/result
+
+##Additional command for alpha diversity
+##Alpha rarefaction plotting
+qiime diversity alpha-rarefaction \
+--i-table 2_asvConstruction/featureTableFiltClean.qza \
+--p-max-depth 78000 \
+--m-metadata-file sample-metadata.tsv \
+--o-visualization ./4_diversityAnalysis/result/alpha-rarefaction.qzv
+
+##Additional alpha diversity index
+qiime diversity alpha \
+  --i-table 2_asvConstruction/featureTableFiltClean.qza \
+  --p-metric chao1 \
+  --o-alpha-diversity ./4_diversityAnalysis/result/chao1_vector.qza
+
+qiime diversity alpha \
+  --i-table 2_asvConstruction/featureTableFiltClean.qza \
+  --p-metric ace \
+  --o-alpha-diversity ./4_diversityAnalysis/result/ace_vector.qza
+
+qiime diversity alpha \
+  --i-table 2_asvConstruction/featureTableFiltClean.qza \
+  --p-metric goods_coverage \
+  --o-alpha-diversity ./4_diversityAnalysis/result/goods_coverage_vector.qza
+
+#Create Visualization files for alpha diversity index
+qiime diversity alpha-group-significance --i-alpha-diversity ./4_diversityAnalysis/result/evenness_vector.qza --m-metadata-file sample-metadata.tsv --o-visualization ./4_diversityAnalysis/result/alpha-group-significance_evenness.qzv
+qiime diversity alpha-group-significance --i-alpha-diversity ./4_diversityAnalysis/result/shannon_vector.qza --m-metadata-file sample-metadata.tsv --o-visualization ./4_diversityAnalysis/result/alpha-group-significance_shannon.qzv
+qiime diversity alpha-group-significance --i-alpha-diversity ./4_diversityAnalysis/result/observed_features_vector.qza   --m-metadata-file sample-metadata.tsv --o-visualization ./4_diversityAnalysis/result/alpha-group-significance_observed_otus.qzv
+qiime diversity alpha-group-significance --i-alpha-diversity ./4_diversityAnalysis/result/ace_vector.qza --m-metadata-file sample-metadata.tsv --o-visualization ./4_diversityAnalysis/result/alpha-group-significance_ace.qzv
+qiime diversity alpha-group-significance --i-alpha-diversity ./4_diversityAnalysis/result/chao1_vector.qza --m-metadata-file sample-metadata.tsv --o-visualization ./4_diversityAnalysis/result/alpha-group-significance_chao1.qzv
+qiime diversity alpha-group-significance --i-alpha-diversity ./4_diversityAnalysis/result/faith_pd_vector.qza --m-metadata-file sample-metadata.tsv --o-visualization ./4_diversityAnalysis/result/alpha-group-significance_faith_pd.qzv
+
+
+##Run PERMANOVA for Beta-diversity
+##with bray_curtis_distance_matrix
+qiime diversity beta-group-significance \
+--i-distance-matrix ./4_diversityAnalysis/result/bray_curtis_distance_matrix.qza \
+--m-metadata-file sample-metadata.tsv \
+--m-metadata-column group \
+--o-visualization ./4_diversityAnalysis/result/permanova_bray_curtis-group.qzv \
+--p-pairwise
+
+##with jaccard_distance_matrix
+qiime diversity beta-group-significance \
+--i-distance-matrix ./4_diversityAnalysis/result/jaccard_distance_matrix.qza \
+--m-metadata-file sample-metadata.tsv \
+--m-metadata-column group \
+--o-visualization ./4_diversityAnalysis/result/permanova_jaccard-group.qzv \
+--p-pairwise
+
+##with unweighted_unifrac_distance_matrix
+qiime diversity beta-group-significance \
+--i-distance-matrix ./4_diversityAnalysis/result/unweighted_unifrac_distance_matrix.qza \
+--m-metadata-file sample-metadata.tsv \
+--m-metadata-column group \
+--o-visualization ./4_diversityAnalysis/result/permanova_unweighted_unifrac-group.qzv \
+--p-pairwise
+
+##with weighted_unifrac_distance_matrix
+qiime diversity beta-group-significance \
+--i-distance-matrix ./4_diversityAnalysis/result/weighted_unifrac_distance_matrix.qza \
+--m-metadata-file sample-metadata.tsv \
+--m-metadata-column group \
+--o-visualization ./4_diversityAnalysis/result/permanova_weighted_unifrac-group.qzv \
+--p-pairwise
+##############################################################################################################
+##DONE!!!
+##############################################################################################################

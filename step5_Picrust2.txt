@@ -1,0 +1,170 @@
+##############################################################################################################
+##PICRUSt2
+##Source: https://github.com/gavinmdouglas/q2-picrust2
+## https://library.qiime2.org/plugins/q2-picrust2/13/
+
+##create picrust2 output directory
+mkdir ./5_additionalAnalysis/picrust2
+
+##Input preparation
+qiime tools export --input-path 2_asvConstruction/featureTableFiltClean.qza --output-path ./5_additionalAnalysis/picrust2
+qiime tools export --input-path 2_asvConstruction/repSeqFiltClean.qza --output-path ./5_additionalAnalysis/picrust2
+
+##Start running PICRUSt2
+conda deactivate
+conda activate picrust2
+
+picrust2_pipeline.py \
+-s ./5_additionalAnalysis/picrust2/dna-sequences.fasta \
+-i ./5_additionalAnalysis/picrust2/feature-table.biom \
+-o ./5_additionalAnalysis/picrust2/picrust2Output \
+-p 4
+
+##Adding description
+add_descriptions.py \
+-i ./5_additionalAnalysis/picrust2/picrust2Output/EC_metagenome_out/pred_metagenome_unstrat.tsv.gz -m EC \
+-o ./5_additionalAnalysis/picrust2/picrust2Output/output_EC_descrip.tsv.gz
+
+add_descriptions.py \
+-i ./5_additionalAnalysis/picrust2/picrust2Output/KO_metagenome_out/pred_metagenome_unstrat.tsv.gz -m KO \
+-o ./5_additionalAnalysis/picrust2/picrust2Output/output_KO_descrip.tsv.gz
+
+add_descriptions.py \
+-i ./5_additionalAnalysis/picrust2/picrust2Output/pathways_out/path_abun_unstrat.tsv.gz -m METACYC \
+-o ./5_additionalAnalysis/picrust2/picrust2Output/output_pathways_descrip.tsv.gz
+
+gunzip ./5_additionalAnalysis/picrust2/picrust2Output/output_EC_descrip.tsv.gz
+gunzip ./5_additionalAnalysis/picrust2/picrust2Output/output_KO_descrip.tsv.gz
+gunzip ./5_additionalAnalysis/picrust2/picrust2Output/output_pathways_descrip.tsv.gz
+
+##############################################################################################################
+##visualize data in qiime2
+conda deactivate
+conda activate qiime2-2020.6
+mkdir ./5_additionalAnalysis/picrust2/picrust2Plot/
+
+##Move and extract Picrust2 output file
+cp ./5_additionalAnalysis/picrust2/picrust2Output/EC_metagenome_out/pred_metagenome_unstrat.tsv.gz ./5_additionalAnalysis/picrust2/picrust2Plot/output_EC.tsv.gz
+cp ./5_additionalAnalysis/picrust2/picrust2Output/KO_metagenome_out/pred_metagenome_unstrat.tsv.gz ./5_additionalAnalysis/picrust2/picrust2Plot/output_KO.tsv.gz
+cp ./5_additionalAnalysis/picrust2/picrust2Output/pathways_out/path_abun_unstrat.tsv.gz ./5_additionalAnalysis/picrust2/picrust2Plot/output_pathways.tsv.gz
+
+gunzip ./5_additionalAnalysis/picrust2/picrust2Plot/output_EC.tsv.gz
+gunzip ./5_additionalAnalysis/picrust2/picrust2Plot/output_KO.tsv.gz
+gunzip ./5_additionalAnalysis/picrust2/picrust2Plot/output_pathways.tsv.gz
+
+##convert frequency to biom table
+biom convert \
+-i ./5_additionalAnalysis/picrust2/picrust2Plot/output_EC.tsv \
+-o ./5_additionalAnalysis/picrust2/picrust2Plot/output_EC.biom \
+--table-type="OTU table" \
+--to-hdf5
+
+biom convert \
+-i ./5_additionalAnalysis/picrust2/picrust2Plot/output_KO.tsv \
+-o ./5_additionalAnalysis/picrust2/picrust2Plot/output_KO.biom \
+--table-type="OTU table" \
+--to-hdf5
+
+biom convert \
+-i ./5_additionalAnalysis/picrust2/picrust2Plot/output_pathways.tsv \
+-o ./5_additionalAnalysis/picrust2/picrust2Plot/output_pathways.biom \
+--table-type="OTU table" \
+--to-hdf5
+
+##[2] Import biom table into QIIME2
+qiime tools import \
+  --input-path ./5_additionalAnalysis/picrust2/picrust2Plot/output_EC.biom \
+  --type 'FeatureTable[Frequency]' \
+  --input-format BIOMV210Format \
+  --output-path ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-EC.qza
+
+qiime tools import \
+  --input-path ./5_additionalAnalysis/picrust2/picrust2Plot/output_KO.biom \
+  --type 'FeatureTable[Frequency]' \
+  --input-format BIOMV210Format \
+  --output-path ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-KO.qza
+
+qiime tools import \
+  --input-path ./5_additionalAnalysis/picrust2/picrust2Plot/output_pathways.biom \
+  --type 'FeatureTable[Frequency]' \
+  --input-format BIOMV210Format \
+  --output-path ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-pathway.qza
+
+##Visualize the data
+qiime feature-table summarize \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-EC.qza \
+--o-visualization ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-EC.qzv
+
+qiime feature-table summarize  \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-KO.qza \
+--o-visualization ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-KO.qzv
+
+qiime feature-table summarize  \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-pathway.qza \
+--o-visualization ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-pathway.qzv
+
+##Filter Sequence from ASV table
+qiime feature-table filter-features \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-EC.qza \
+--p-min-frequency 100 \
+--p-min-samples 3 \
+--o-filtered-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-EC-filt.qza
+
+qiime feature-table filter-features \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-KO.qza \
+--p-min-frequency 100 \
+--p-min-samples 3 \
+--o-filtered-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-KO-filt.qza
+
+qiime feature-table filter-features \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-pathway.qza \
+--p-min-frequency 100 \
+--p-min-samples 3 \
+--o-filtered-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-pathway-filt.qza
+
+##Visualize filtered data
+qiime feature-table summarize \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-EC-filt.qza \
+--o-visualization ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-EC-filt.qzv
+
+qiime feature-table summarize  \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-KO-filt.qza \
+--o-visualization ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-KO-filt.qzv
+
+qiime feature-table summarize  \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-pathway-filt.qza \
+--o-visualization ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-pathway-filt.qzv
+
+##Export visualization
+qiime tools export \
+--input-path ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-EC-filt.qzv \
+--output-path ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-EC-filt
+
+qiime tools export \
+--input-path ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-KO-filt.qzv \
+--output-path ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-KO-filt
+
+qiime tools export \
+--input-path ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-pathway-filt.qzv \
+--output-path ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-pathway-filt
+#######################################
+##Run diversity analysis
+#######################################
+qiime diversity core-metrics \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-EC-filt.qza \
+--p-sampling-depth 19959166 \
+--m-metadata-file sample-metadata.tsv \
+--output-dir ./5_additionalAnalysis/picrust2/picrust2Plot/diversity-analysis-EC
+
+qiime diversity core-metrics \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-KO-filt.qza \
+--p-sampling-depth 37678744 \
+--m-metadata-file sample-metadata.tsv \
+--output-dir ./5_additionalAnalysis/picrust2/picrust2Plot/diversity-analysis-KO
+
+qiime diversity core-metrics \
+--i-table ./5_additionalAnalysis/picrust2/picrust2Plot/feature-table-pathway-filt.qza \
+--p-sampling-depth 4226008 \
+--m-metadata-file sample-metadata.tsv \
+--output-dir ./5_additionalAnalysis/picrust2/picrust2Plot/diversity-analysis-pathway
+##############################################################################################################

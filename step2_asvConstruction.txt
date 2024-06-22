@@ -1,0 +1,108 @@
+#####################################################################################
+##Step2 ==> ASV construction by DADA2
+##Source: https://otagoedna.github.io/getting_started_with_qiime2/first_workflow.html
+##Source: https://docs.qiime2.org/2021.11/tutorials/importing/
+##Source: http://compbio.ucsd.edu/wp-content/uploads/2018/07/20180621_oslo_university_microbiome_analysis_with_qiime2_tutorial.pdf
+##source DADA2 tutorial: https://benjjneb.github.io/dada2/tutorial_1_4.html?fbclid=IwAR3YS6RJDPThvfixIHv_AcVujbd0UhHmQKqmTozEohb4aZGrQtpblOvEgto
+##source DADA2 tutorial: https://bioconductor.org/packages/devel/bioc/vignettes/dada2/inst/doc/dada2-intro.html?fbclid=IwAR2T8TiOr7gruYPBJfK5VsoyJ_nKfW-nHCEtD8myTkW8GX5HGabzJuXuwVo
+#####################################################################################
+##Input type: joined sequences ==> Single End sequence
+##Input sequences were from company with no barcode and primer sequences.
+##Input sequences were performed quality control (QC) before doing this step.
+#####################################################################################
+##Create directory for this step
+mkdir 2_asvConstruction
+#####################################################################################
+##[1] Import separated Single end sequences
+##Before importing sequences, please check se-33-manifest file
+
+qiime tools import \
+  --type 'SampleData[SequencesWithQuality]' \
+  --input-path se-33-manifest \
+  --output-path 2_asvConstruction/single-end-demux.qza \
+  --input-format SingleEndFastqManifestPhred33V2
+
+qiime demux summarize \
+--i-data 2_asvConstruction/single-end-demux.qza \
+--o-visualization 2_asvConstruction/single-end-demux.qzv
+
+qiime tools export \
+--input-path ./2_asvConstruction/single-end-demux.qzv \
+--output-path ./2_asvConstruction/1_summary_import_sequence
+#####################################################################################
+##[2] Running DADA2
+##Before running DADA2 please check parameters;
+##--p-trim-left and --p-trunc-len from single-end-demux.qzv
+
+qiime dada2 denoise-single \
+--p-trim-left 0 \
+--p-trunc-len 400 \
+--p-n-threads 8 \
+--i-demultiplexed-seqs 2_asvConstruction/single-end-demux.qza \
+--o-representative-sequences 2_asvConstruction/repSeq.qza \
+--o-table 2_asvConstruction/featureTable.qza \
+--o-denoising-stats 2_asvConstruction/dada2Stats.qza
+
+qiime metadata tabulate \
+--m-input-file 2_asvConstruction/dada2Stats.qza \
+--o-visualization 2_asvConstruction/dada2Stats.qzv
+
+qiime feature-table summarize \
+  --i-table 2_asvConstruction/featureTable.qza \
+  --o-visualization 2_asvConstruction/featureTable.qzv \
+  --m-sample-metadata-file sample-metadata.tsv
+
+qiime feature-table tabulate-seqs \
+  --i-data 2_asvConstruction/repSeq.qza \
+  --o-visualization 2_asvConstruction/repSeq.qzv
+
+##Export result
+qiime tools export \
+--input-path ./2_asvConstruction/dada2Stats.qzv \
+--output-path ./2_asvConstruction/2_dada2_statistics
+
+qiime tools export \
+--input-path ./2_asvConstruction/featureTable.qzv \
+--output-path ./2_asvConstruction/2_summary_featureTable
+
+qiime tools export \
+--input-path ./2_asvConstruction/repSeq.qzv \
+--output-path ./2_asvConstruction/2_summary_representative_sequence
+#############################################################
+##Pipeline to analysis dada2 ASV table with QIIME2
+#############################################################
+##[3] Filter ASV table from DADA2
+##Since number of replication is 3, so I decided the number of each ASV should be found atleast 3 samples.
+
+qiime feature-table filter-features \
+--i-table 2_asvConstruction/featureTable.qza \
+--p-min-frequency 10 \
+--p-min-samples 2 \
+--o-filtered-table 2_asvConstruction/featureTableFilt.qza
+
+qiime feature-table filter-seqs \
+--i-data 2_asvConstruction/repSeq.qza \
+--i-table 2_asvConstruction/featureTableFilt.qza \
+--o-filtered-data 2_asvConstruction/repSeqFilt.qza
+
+##Visualize filtered data
+qiime feature-table summarize \
+--i-table 2_asvConstruction/featureTableFilt.qza \
+--o-visualization 2_asvConstruction/featureTableFilt.qzv
+
+qiime feature-table tabulate-seqs \
+--i-data 2_asvConstruction/repSeqFilt.qza \
+--o-visualization 2_asvConstruction/repSeqFilt.qzv
+
+##Export result
+qiime tools export \
+--input-path ./2_asvConstruction/featureTableFilt.qzv \
+--output-path ./2_asvConstruction/3_summary_featureTable_filter
+
+qiime tools export \
+--input-path ./2_asvConstruction/repSeqFilt.qzv \
+--output-path ./2_asvConstruction/3_summary_representative_sequence_filter
+
+#############################################################
+##Done
+#############################################################
